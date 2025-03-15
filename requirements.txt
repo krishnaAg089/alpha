@@ -3,3 +3,4 @@ pandas
 joblib
 datetime
 scikit-learn
+gunicorn
