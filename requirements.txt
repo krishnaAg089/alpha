@@ -1,6 +1,5 @@
 Flask
 pandas
 joblib
-pickle
 datetime
 scikit-learn
