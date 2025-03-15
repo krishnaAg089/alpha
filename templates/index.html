@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Best Doctors</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            background-color: #f4f8fb;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 20px;
+        }
+        .container {
+            background: white;
+            max-width: 600px;
+            margin: 30px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+            margin: 8px;
+            border: none;
+            border-radius: 5px;
+        }
+        input {
+            border: 2px solid #3498db;
+            width: 150px;
+            text-align: center;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #2980b9;
+            transform: scale(1.05);
+        }
+        #doctors-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #27ae60;
+            color: white;
+        }
+        tbody tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+        .hidden {
+            display: none;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2ecc71;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 5px;
+            display: none;
+            font-size: 14px;
+            animation: fadeInOut 3s ease-in-out;
+        }
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            20%, 80% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Find Doctors For Survey</h1>
+    <div class="container">
+        <label for="time">Enter Time (HH:MM): </label>
+        <input type="time" id="time">
+        <button onclick="findDoctors()">Search</button>
+        <button onclick="downloadCSV()" id="download-btn" class="hidden">Download CSV</button>
+
+        <div class="loader hidden" id="loading-spinner"></div>
+
+        <h2> Doctors Available</h2>
+        <table id="doctors-table">
+            <thead>
+                <tr>
+                    <th>NPI</th>
+                    <th>Survey Probability</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        function showToast(message) {
+            let toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.style.display = "block";
+            setTimeout(() => {
+                toast.style.display = "none";
+            }, 3000);
+        }
+
+        function findDoctors() {
+            let time = document.getElementById("time").value;
+
+            if (!time) {
+                showToast("⚠️ Please enter a valid time.");
+                return;
+            }
+
+            $("#doctors-table tbody").html("");
+            $("#loading-spinner").removeClass("hidden");
+            $("#download-btn").hide();
+
+            $.post("/get_best_doctors", { time: time })
+            .done(function(response) {
+                let tableBody = $("#doctors-table tbody");
+                tableBody.empty();
+                $("#loading-spinner").addClass("hidden");
+
+                if (response.error) {
+                    showToast("❌ " + response.error);
+                    return;
+                }
+
+                if (response.message) {
+                    tableBody.append(`<tr><td colspan="2">${response.message}</td></tr>`);
+                    return;
+                }
+
+                response.forEach(doctor => {
+                    tableBody.append(`<tr><td>${doctor.NPI}</td><td>${doctor["Survey Probability"].toFixed(2)}</td></tr>`);
+                });
+
+                if (response.length > 0) {
+                    $("#download-btn").show();
+                    showToast("✅ Doctors fetched successfully!");
+                }
+            })
+            .fail(function() {
+                $("#loading-spinner").addClass("hidden");
+                showToast("❌ An error occurred while fetching doctors.");
+            });
+        }
+
+        function downloadCSV() {
+            let table = document.getElementById("doctors-table");
+            let rows = table.getElementsByTagName("tr");
+            let csvContent = "data:text/csv;charset=utf-8,";
+
+            csvContent += "NPI,Probability\n";
+
+            for (let i = 1; i < rows.length; i++) {
+                let cols = rows[i].getElementsByTagName("td");
+                let rowData = [];
+                for (let j = 0; j < cols.length; j++) {
+                    rowData.push(cols[j].innerText);
+                }
+                csvContent += rowData.join(",") + "\n";
+            }
+
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "best_doctors.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+    </script>
+</body>
+</html>
